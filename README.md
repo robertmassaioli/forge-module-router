@@ -201,24 +201,6 @@ import { Link } from 'forge-module-router';
 
 ---
 
-### `useEffectAsync(callback, deps)`
-
-A `useEffect` replacement for async callbacks. The latest `callback` is always invoked via a ref — no stale closure risk. Supports async cleanup.
-
-```tsx
-import { useEffectAsync } from 'forge-module-router';
-
-useEffectAsync(async () => {
-  const data = await fetchData(id);
-  setState(data);
-
-  // Optional: return a cleanup function
-  return () => cancel();
-}, [id]);
-```
-
----
-
 ### `ForgeContextError`
 
 Thrown by `useForgeContext()` when called outside a `<ForgeContextProvider>`.

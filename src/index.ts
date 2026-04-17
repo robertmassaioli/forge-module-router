@@ -7,9 +7,6 @@ export { ContextRoute } from './ContextRouter';
 // SPA routing integrated with Forge history
 export { SpaRouter, Link } from './SpaRouter';
 
-// Utility hook
-export { useEffectAsync } from './useEffectAsync';
-
 // Errors
 export { ForgeContextError } from './errors';
 
@@ -24,3 +21,4 @@ export type {
   SpaRouterProps,
   LinkProps,
 } from './types';
+
