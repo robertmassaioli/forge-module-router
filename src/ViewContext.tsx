@@ -5,7 +5,7 @@ import type { ForgeContext, ForgeContextProviderProps } from './types';
 
 type ContextValue = ForgeContext | undefined;
 
-const ForgeContextInternal = createContext<ContextValue>(undefined);
+export const ForgeContextInternal = createContext<ContextValue>(undefined);
 
 /**
  * Returns the current Forge context object.
