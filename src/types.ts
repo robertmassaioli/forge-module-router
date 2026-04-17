@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { FullContext } from '@forge/bridge';
 
 export interface ForgeModalContext {
   type: string;
@@ -10,21 +11,13 @@ export interface ForgeExtension {
   [key: string]: unknown;
 }
 
-export interface ForgeLicenseDetails {
-  isActive: boolean;
-}
+// Derive ForgeLicenseDetails from FullContext so we stay in sync with @forge/bridge
+// without relying on unexported types.
+export type ForgeLicenseDetails = NonNullable<FullContext['license']>;
 
-export interface ForgeContext {
-  accountId?: string;
-  cloudId?: string;
-  extension: ForgeExtension;
-  license?: ForgeLicenseDetails;
-  localId: string;
-  locale: string;
-  moduleKey: string;
-  siteUrl: string;
-  timezone: string;
-}
+// ForgeContext is an alias for FullContext from @forge/bridge.
+// Using the bridge's own type ensures we never diverge from what view.getContext() actually returns.
+export type ForgeContext = FullContext;
 
 export interface ForgeContextProviderProps {
   children: React.ReactNode;

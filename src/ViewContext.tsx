@@ -43,7 +43,7 @@ export function ForgeContextProvider ({
 
   useEffect(() => {
     view.getContext()
-      .then((ctx) => setContext(ctx as ForgeContext))
+      .then((ctx) => setContext(ctx))
       .catch((err: unknown) => {
         onError?.(err);
         console.error('[forge-module-router] Failed to fetch Forge context:', err);
