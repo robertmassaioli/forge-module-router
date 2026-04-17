@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ForgeContextError } from './errors';
+import { ForgeContextError } from '../src/errors';
 
 describe('ForgeContextError', () => {
   it('is an instance of Error', () => {

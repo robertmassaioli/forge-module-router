@@ -1,9 +1,9 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { ForgeContextProvider, useForgeContext } from './ViewContext';
-import { ForgeContextError } from './errors';
-import type { ForgeContext } from './types';
+import { ForgeContextProvider, useForgeContext } from '../src/ViewContext';
+import { ForgeContextError } from '../src/errors';
+import type { ForgeContext } from '../src/types';
 
 // Mock @forge/bridge so tests never need a real Forge environment
 vi.mock('@forge/bridge', () => ({

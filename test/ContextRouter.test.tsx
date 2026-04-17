@@ -1,10 +1,10 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ContextRoute } from './ContextRouter';
-import { ForgeContextError } from './errors';
-import { ForgeContextInternal } from './ViewContext';
-import type { ForgeContext } from './types';
+import { ContextRoute } from '../src/ContextRouter';
+import { ForgeContextError } from '../src/errors';
+import { ForgeContextInternal } from '../src/ViewContext';
+import type { ForgeContext } from '../src/types';
 
 // We need direct access to the internal context to set up test wrappers
 // without going through the async ForgeContextProvider.
