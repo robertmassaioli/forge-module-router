@@ -264,7 +264,7 @@ interface ForgeContext {
 | `<ContextRoute noModal>`    | `<ContextRoute noModal>` ✅ same     |
 | `<ContextRoute modalType>`  | `<ContextRoute modalType>` ✅ same   |
 | `<SpaRouter>`               | `<SpaRouter>` ✅ same                |
-| `useEffectAsync(cb, dep)`   | `useEffectAsync(cb, [dep])` (std deps array) |
+| `useEffectAsync(cb, dep)`   | Use `useEffect` with an async IIFE directly  |
 
 ---
 
