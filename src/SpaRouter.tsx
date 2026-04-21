@@ -39,7 +39,16 @@ export function SpaRouter ({ children, fallback = null }: SpaRouterProps) {
   useEffect(() => {
     let cancelled = false;
 
-    const onUpdate = (location: Location, action: Action) => {
+    // Forge's view.createHistory() listener uses the history v4 signature:
+    // (location, action) as two positional arguments.
+    const onForgeUpdate = (location: Location, action: Action) => {
+      if (!cancelled) {
+        setHistoryState({ location, action });
+      }
+    };
+
+    // The history v5 createMemoryHistory listener uses a single object argument.
+    const onMemoryUpdate = ({ location, action }: { location: Location; action: Action }) => {
       if (!cancelled) {
         setHistoryState({ location, action });
       }
@@ -54,8 +63,7 @@ export function SpaRouter ({ children, fallback = null }: SpaRouterProps) {
 
         setNavigator(history);
         setHistoryState({ action: history.action as Action, location: history.location as Location });
-        // Forge history listener uses the same { location, action } shape as history v5
-        cleanupRef.current = history.listen(onUpdate) as () => void;
+        cleanupRef.current = history.listen(onForgeUpdate as never) as () => void;
       } catch {
         // Fallback: in-memory history for dev/test environments where
         // view.createHistory() is not available.
@@ -64,7 +72,7 @@ export function SpaRouter ({ children, fallback = null }: SpaRouterProps) {
 
         setNavigator(history);
         setHistoryState({ action: history.action, location: history.location });
-        cleanupRef.current = history.listen(onUpdate);
+        cleanupRef.current = history.listen(onMemoryUpdate);
       }
     })();
 
