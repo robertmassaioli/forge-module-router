@@ -1,0 +1,27 @@
+{
+  "name": "forge-module-router-matrix-fixture",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "forge-module-router": "FORGE_MODULE_ROUTER_VERSION",
+    "react": "REACT_VERSION",
+    "react-dom": "REACT_VERSION",
+    "react-router-dom": "REACT_ROUTER_VERSION",
+    "@forge/bridge": "BRIDGE_VERSION",
+    "history": "^5.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "vitest": "^2.0.0",
+    "jsdom": "^29.0.2",
+    "@vitest/coverage-v8": "^2.0.0"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}

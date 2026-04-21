@@ -31,6 +31,7 @@
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.19.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.0.0",
     "vitest": "^2.0.0"
   },
@@ -38,7 +39,9 @@
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:matrix": "tsx test-matrix/runner/run-matrix.ts",
+    "test:matrix:quick": "tsx test-matrix/runner/run-matrix.ts --combinations=M1,M2,M6"
   },
   "keywords": [
     "forge",
