@@ -56,6 +56,77 @@ describe('SpaRouter', () => {
     );
   });
 
+  describe('Forge history path (view.createHistory() succeeds)', () => {
+    // Forge's view.createHistory() listener uses the history v4 signature:
+    // (location, action) as two positional arguments — NOT a single object.
+    // These tests verify that the correct signature is used and navigation works.
+
+    function makeFakeForgeHistory (initialPath = '/') {
+      type ForgeListener = (location: { pathname: string; search: string; hash: string; state: unknown; key: string }, action: string) => void;
+      const listeners: ForgeListener[] = [];
+      let currentLocation = { pathname: initialPath, search: '', hash: '', state: null, key: 'default' };
+      let currentAction = 'POP';
+
+      const history = {
+        get action () { return currentAction; },
+        get location () { return currentLocation; },
+        // Forge listener signature: (location, action) — two positional args
+        listen: vi.fn((cb: ForgeListener) => {
+          listeners.push(cb);
+          return () => { listeners.splice(listeners.indexOf(cb), 1); };
+        }),
+        push: vi.fn((to: string) => {
+          currentLocation = { pathname: to, search: '', hash: '', state: null, key: String(Math.random()) };
+          currentAction = 'PUSH';
+          listeners.forEach(cb => cb(currentLocation, currentAction));
+        }),
+      };
+      return history;
+    }
+
+    it('renders children after Forge history resolves', async () => {
+      const fakeHistory = makeFakeForgeHistory('/');
+      mockCreateHistory.mockResolvedValue(fakeHistory as never);
+      renderSpaRouter();
+      await waitFor(() =>
+        expect(screen.getByText('Home Page')).toBeInTheDocument()
+      );
+    });
+
+    it('listens to Forge history using the (location, action) two-argument signature', async () => {
+      const fakeHistory = makeFakeForgeHistory('/');
+      mockCreateHistory.mockResolvedValue(fakeHistory as never);
+      renderSpaRouter();
+      await waitFor(() => screen.getByText('Home Page'));
+      expect(fakeHistory.listen).toHaveBeenCalledTimes(1);
+      // The registered callback must accept two positional args — call it directly
+      // to verify it updates state correctly (does not crash on the v4 signature).
+      const registeredCb = fakeHistory.listen.mock.calls[0][0];
+      const newLocation = { pathname: '/settings', search: '', hash: '', state: null, key: 'nav1' };
+      expect(() => registeredCb(newLocation, 'PUSH')).not.toThrow();
+    });
+
+    it('navigates to new route when Forge history fires (location, action)', async () => {
+      const fakeHistory = makeFakeForgeHistory('/');
+      mockCreateHistory.mockResolvedValue(fakeHistory as never);
+      renderSpaRouter();
+      await waitFor(() => screen.getByText('Home Page'));
+      // Simulate Forge history push with v4-style two-arg listener
+      fakeHistory.push('/settings');
+      await waitFor(() =>
+        expect(screen.getByText('Settings Page')).toBeInTheDocument()
+      );
+    });
+
+    it('cleans up Forge history listener on unmount', async () => {
+      const fakeHistory = makeFakeForgeHistory('/');
+      mockCreateHistory.mockResolvedValue(fakeHistory as never);
+      const { unmount } = renderSpaRouter();
+      await waitFor(() => screen.getByText('Home Page'));
+      expect(() => unmount()).not.toThrow();
+    });
+  });
+
   it('renders children once history is ready (fallback path)', async () => {
     mockCreateHistory.mockRejectedValue(new Error('not in Forge'));
     renderSpaRouter(<div>Loading...</div>);

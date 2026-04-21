@@ -268,6 +268,50 @@ interface ForgeContext {
 
 ---
 
+## Troubleshooting
+
+### "Invalid hook call" / "Cannot read properties of null (reading 'useState')"
+
+This means there are **two copies of React** in your app. React enforces a singleton — if
+`forge-module-router` resolves a different copy of React than your app, hooks will crash.
+
+This most commonly happens when using `npm link` for local development. Fix it by
+pointing `forge-module-router`'s React at your app's copy:
+
+```bash
+# From the forge-module-router directory:
+rm -rf node_modules/react node_modules/react-dom node_modules/react-router-dom
+ln -s /path/to/your-app/node_modules/react node_modules/react
+ln -s /path/to/your-app/node_modules/react-dom node_modules/react-dom
+ln -s /path/to/your-app/node_modules/react-router-dom node_modules/react-router-dom
+```
+
+In a monorepo or bundler setup, ensure all packages resolve React to the same instance
+(e.g. via webpack's `resolve.alias` or pnpm's `dedupe`).
+
+---
+
+### "useRoutes() may be used only in the context of a \<Router\>"
+
+This means there are **two copies of `react-router-dom`** — the `<Router>` context was
+set by one instance but `<Routes>` is reading from another. The fix is the same as
+above: symlink your app's `react-router-dom` into `forge-module-router/node_modules/`
+during local development.
+
+---
+
+### App is blank / stuck on fallback after navigation
+
+If you are using `<SpaRouter>` and the app renders correctly on first load but goes blank
+or gets stuck after navigating, check that `view.createHistory()` is available in your
+environment. In `forge tunnel`, it should resolve. In a plain browser (outside Forge),
+it will reject and fall back to in-memory history.
+
+Also ensure you are not accidentally re-mounting `<SpaRouter>` on context changes — the
+history object is created once on mount and must not be recreated on re-renders.
+
+---
+
 ## Building
 
 ```bash
