@@ -39,7 +39,7 @@ export function SpaRouter ({ children, fallback = null }: SpaRouterProps) {
   useEffect(() => {
     let cancelled = false;
 
-    const onUpdate = ({ location, action }: { location: Location; action: Action }) => {
+    const onUpdate = (location: Location, action: Action) => {
       if (!cancelled) {
         setHistoryState({ location, action });
       }
