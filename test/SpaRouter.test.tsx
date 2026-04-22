@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { SpaRouter, Link } from '../src/SpaRouter';
@@ -103,7 +103,7 @@ describe('SpaRouter', () => {
       // to verify it updates state correctly (does not crash on the v4 signature).
       const registeredCb = fakeHistory.listen.mock.calls[0][0];
       const newLocation = { pathname: '/settings', search: '', hash: '', state: null, key: 'nav1' };
-      expect(() => registeredCb(newLocation, 'PUSH')).not.toThrow();
+      expect(() => act(() => registeredCb(newLocation, 'PUSH'))).not.toThrow();
     });
 
     it('navigates to new route when Forge history fires (location, action)', async () => {
@@ -112,7 +112,7 @@ describe('SpaRouter', () => {
       renderSpaRouter();
       await waitFor(() => screen.getByText('Home Page'));
       // Simulate Forge history push with v4-style two-arg listener
-      fakeHistory.push('/settings');
+      act(() => { fakeHistory.push('/settings'); });
       await waitFor(() =>
         expect(screen.getByText('Settings Page')).toBeInTheDocument()
       );
@@ -208,7 +208,7 @@ describe('Link', () => {
   it('navigates to the target route on click without full page reload', async () => {
     const user = userEvent.setup();
     await renderLink('/settings');
-    await user.click(screen.getByRole('link', { name: 'Go to Settings' }));
+    await act(async () => { await user.click(screen.getByRole('link', { name: 'Go to Settings' })); });
     await waitFor(() =>
       expect(screen.getByText('Settings Page')).toBeInTheDocument()
     );
@@ -221,7 +221,7 @@ describe('Link', () => {
     // After clicking, the router navigates to /settings and renders Settings Page.
     // If preventDefault had NOT been called, jsdom would not perform client-side
     // navigation and the Settings Page would not appear.
-    await user.click(link);
+    await act(async () => { await user.click(link); });
     await waitFor(() =>
       expect(screen.getByText('Settings Page')).toBeInTheDocument()
     );
