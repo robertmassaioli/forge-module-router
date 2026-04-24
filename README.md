@@ -1,8 +1,80 @@
 # forge-module-router
 
-Context-aware routing primitives for [Atlassian Forge](https://developer.atlassian.com/platform/forge/) Custom UI apps.
+A routing library for [Atlassian Forge](https://developer.atlassian.com/platform/forge/) Custom UI apps that solves two fundamental problems:
 
-Provides three composable building blocks that let you declaratively render the correct UI based on the Forge module context, and wire up SPA-style navigation using Forge's native history API.
+1. **SPA routing in full-page apps** — `<SpaRouter>` encapsulates all of the complex wiring described in Atlassian's [Add routing to a full-page app](https://developer.atlassian.com/platform/forge/add-routing-to-a-full-page-app/) guide into a single, drop-in component. You get browser-back/forward integration with the Atlassian product shell for free.
+
+2. **One static frontend package, many Forge modules** — `<ContextRoute>` gives you a React Router-like declarative experience for conditionally rendering the right UI based on which Forge module (panel, page, modal, etc.) is currently active. This lets you ship and maintain **a single static frontend resource** across all of your Forge app's modules instead of one bundle per module.
+
+---
+
+## Why this library?
+
+### Problem 1: SPA routing in Forge is non-trivial
+
+Forge full-page apps (e.g. `jira:globalPage`, `confluence:globalPage`) support sub-pages and sidebar navigation via the `pages` manifest field. When a user clicks a tab, Atlassian updates the URL — but **your app is responsible for listening to those URL changes and rendering the correct component**.
+
+Atlassian's [official guide](https://developer.atlassian.com/platform/forge/add-routing-to-a-full-page-app/) walks through how to wire up `view.createHistory()` from `@forge/bridge` into React Router's `<Router>`. It involves async initialisation, action/location state management, listener cleanup, and environment fallbacks for local development. `<SpaRouter>` handles all of that for you.
+
+**Before** (manual wiring, ~40 lines of boilerplate):
+```tsx
+// Async history init, state management, listener cleanup,
+// in-memory fallback for dev/test... all done by hand.
+const [historyState, setHistoryState] = useState(null);
+const [navigator, setNavigator] = useState(null);
+useEffect(() => {
+  (async () => {
+    try {
+      const history = await view.createHistory();
+      setNavigator(history);
+      setHistoryState({ action: history.action, location: history.location });
+      history.listen((location, action) => setHistoryState({ action, location }));
+    } catch {
+      const history = createMemoryHistory();
+      // ...
+    }
+  })();
+}, []);
+if (!navigator || !historyState) return fallback;
+return <Router navigator={navigator} navigationType={historyState.action} location={historyState.location}>...</Router>;
+```
+
+**After** (with `<SpaRouter>`):
+```tsx
+<SpaRouter>
+  <Routes>
+    <Route path="/" element={<Home />} />
+    <Route path="/settings" element={<Settings />} />
+  </Routes>
+</SpaRouter>
+```
+
+### Problem 2: One frontend package for all your Forge modules
+
+Forge requires each `resource` in your manifest to be a separate static bundle. Without a routing strategy, teams end up maintaining a separate React app per module (one for your panel, one for your global page, one for your admin page, etc.).
+
+`<ContextRoute>` reads the Forge context at runtime to determine which module is active, letting you write declarative, React Router-style JSX that conditionally renders the right component tree — all from a single entry point:
+
+```tsx
+<ForgeContextProvider>
+  <ContextRoute moduleKey="my-jira-panel">
+    <MyPanel />
+  </ContextRoute>
+  <ContextRoute moduleKey="my-global-page">
+    <SpaRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </SpaRouter>
+  </ContextRoute>
+  <ContextRoute moduleKey="my-admin-page">
+    <AdminPage />
+  </ContextRoute>
+</ForgeContextProvider>
+```
+
+All three modules share the same static resource — one bundle to build, test, and deploy.
 
 ---
 
@@ -41,7 +113,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ForgeContextProvider fallback={<div>Loading...</div>}>
 
-      {/* Render based on which Forge module is active */}
+      {/* Render a panel module with SPA sub-page routing */}
       <ContextRoute moduleKey="my-jira-panel">
         <ContextRoute noModal>
           <SpaRouter>
@@ -99,6 +171,8 @@ function MyComponent() {
 
 Conditionally renders children based on the current Forge context. All specified props must match simultaneously. Unspecified props act as wildcards.
 
+This is the primary building block for serving multiple Forge modules from a single static frontend package. Think of it as a React Router `<Route>`, but matching on Forge module context instead of URL path.
+
 | Prop        | Type      | Description                                                        |
 |-------------|-----------|--------------------------------------------------------------------|
 | `moduleKey` | `string`  | Only render if `context.moduleKey` equals this value.              |
@@ -121,7 +195,9 @@ Conditionally renders children based on the current Forge context. All specified
 
 ### `<SpaRouter>`
 
-Wraps React Router's `<Router>` and wires it to Forge's [`view.createHistory()`](https://developer.atlassian.com/platform/forge/apis-reference/ui-api-bridge/view/#createhistory) from `@forge/bridge`. Falls back to an in-memory history in non-Forge environments (e.g. local dev).
+Wraps React Router's `<Router>` and wires it to Forge's [`view.createHistory()`](https://developer.atlassian.com/platform/forge/apis-reference/ui-api-bridge/view/#createhistory) from `@forge/bridge`. This is the drop-in solution for everything described in Atlassian's [Add routing to a full-page app](https://developer.atlassian.com/platform/forge/add-routing-to-a-full-page-app/) guide.
+
+Falls back to an in-memory history in non-Forge environments (e.g. local dev or tests) so your app works seamlessly outside of `forge tunnel`.
 
 History is created **once on mount** — it is never recreated on context re-renders.
 
@@ -136,9 +212,9 @@ History is created **once on mount** — it is never recreated on context re-ren
 
 #### When to use `<SpaRouter>`
 
-`<SpaRouter>` is required whenever your Forge module uses the `pages` or `sections` manifest field to register subpages. Atlassian's sidebar/tab navigation updates the URL, but **your app is responsible for handling those URL changes** — that is exactly what `view.createHistory()` (and therefore `<SpaRouter>`) does.
+`<SpaRouter>` is required whenever your Forge module uses the `pages` or `sections` manifest field to register sub-pages. Atlassian's sidebar/tab navigation updates the URL, but **your app is responsible for handling those URL changes** — that is exactly what `view.createHistory()` (and therefore `<SpaRouter>`) does.
 
-The following Forge modules support subpages and require `<SpaRouter>` for in-app navigation:
+The following Forge modules support sub-pages and require `<SpaRouter>` for in-app navigation:
 
 | Module | Manifest key | Subpage doc |
 |--------|-------------|-------------|
@@ -153,7 +229,7 @@ The following Forge modules support subpages and require `<SpaRouter>` for in-ap
 
 > **Note:** The `pages`/`sections` manifest configuration only changes the URL — Atlassian does not render different components for you. You must map URLs to components yourself using `<SpaRouter>` + React Router `<Routes>`.
 
-**Example manifest** (`jira:globalPage` with subpages):
+**Example manifest** (`jira:globalPage` with sub-pages):
 
 ```yaml
 modules:
