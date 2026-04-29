@@ -39,17 +39,16 @@ function moduleKeyMatches(
     environmentType !== 'PRODUCTION' &&
     contextKey.startsWith(propKey + '-')
   ) {
-    // Warn in non-production builds so developers are alerted to potential ambiguity.
-    // e.g. if 'my-macro' and 'my-macro-v2' are both declared, both ContextRoutes
-    // would match when the active module is 'my-macro-v2-dev'.
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(
-        `[forge-module-router] ContextRoute moduleKey="${propKey}" matched via environment ` +
-        `prefix-match (context moduleKey is "${contextKey}", environmentType is "${environmentType ?? 'unknown'}"). ` +
-        `If you have another <ContextRoute> whose moduleKey also starts with "${propKey}-", ` +
-        `both routes will render simultaneously. Rename one manifest module key to avoid ambiguity.`
-      );
-    }
+    // Warn whenever prefix-match fires. This is only reachable when environmentType
+    // is explicitly non-PRODUCTION — i.e. it never fires in production — so no
+    // NODE_ENV guard is needed (and process.env is not available in the Forge
+    // Custom UI browser runtime anyway).
+    console.warn(
+      `[forge-module-router] ContextRoute moduleKey="${propKey}" matched via environment ` +
+      `prefix-match (context moduleKey is "${contextKey}", environmentType is "${environmentType}"). ` +
+      `If you have another <ContextRoute> whose moduleKey also starts with "${propKey}-", ` +
+      `both routes will render simultaneously. Rename one manifest module key to avoid ambiguity.`
+    );
     return true;
   }
 

@@ -159,21 +159,14 @@ describe('ContextRoute', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('does NOT emit a console.warn in production builds (NODE_ENV=production)', () => {
-      const originalEnv = process.env.NODE_ENV;
-      // @ts-expect-error — overriding read-only env for test
-      process.env.NODE_ENV = 'production';
-      try {
-        // Exact match in production — no warn expected
-        renderWithContext(
-          makeContext({ moduleKey: 'my-module', environmentType: 'PRODUCTION' }),
-          { moduleKey: 'my-module' }
-        );
-        expect(warnSpy).not.toHaveBeenCalled();
-      } finally {
-        // @ts-expect-error
-        process.env.NODE_ENV = originalEnv;
-      }
+    it('does NOT emit a console.warn in PRODUCTION (prefix-match branch is never reached)', () => {
+      // In PRODUCTION environmentType, prefix-match is disabled entirely —
+      // only exact match is tried, so no warn is ever emitted.
+      renderWithContext(
+        makeContext({ moduleKey: 'my-module', environmentType: 'PRODUCTION' }),
+        { moduleKey: 'my-module' }
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 
