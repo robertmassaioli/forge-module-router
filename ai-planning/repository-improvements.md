@@ -364,6 +364,6 @@ history API shape) rather than silently passing.
 | 8 | Add `renovate.json` for automated dep updates | Security | Trivial | ⬜ Todo |
 | 9 | Expand test-matrix fixture coverage | Testing | Medium | ⬜ Todo |
 | 10 | Add post-publish smoke test to release workflow | Security | Small | ⬜ Todo |
-| 11 | Document prefix-match behaviour in README | Docs | Small | ✅ Done |
+| 11 | Document prefix-match behaviour in README | Docs | Small | ✅ Done (dedicated subsection added to `<ContextRoute>` API docs) |
 | 12 | Type-check test files in CI | Type safety | Small | ⬜ Todo |
 | 13 | Replace `as never` casts in `SpaRouter` | Type safety | Medium | ⬜ Todo |
