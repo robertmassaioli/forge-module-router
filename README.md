@@ -193,16 +193,11 @@ This is the primary building block for serving multiple Forge modules from a sin
 
 #### `moduleKey` matching across environments
 
-> **Affected module types only.** Not all Forge modules have an environment
-> suffix appended to their `moduleKey`. This behaviour is most commonly observed
-> in **Confluence macros** (`confluence:macro`) and other module types that are
-> installed per-environment rather than globally. If your app only uses module
-> types where you have not observed a suffix, the prefix-match path is never
-> reached and there is no behavioural difference from a plain exact match.
-
-In non-production Forge environments, Atlassian appends the environment name as
-a suffix to `context.moduleKey` for affected module types. A module declared as
-`my-macro` in the manifest will appear as:
+For some Forge module types — most notably **Confluence macros**
+(`confluence:macro`) — Atlassian appends the active environment name to
+`context.moduleKey` in non-production environments. So a module declared with
+key `my-macro` in the manifest will surface with different values depending on
+where the app is running:
 
 | Environment | `context.moduleKey` |
 |---|---|
@@ -210,21 +205,29 @@ a suffix to `context.moduleKey` for affected module types. A module declared as
 | Staging | `my-macro-stg` |
 | Development (default) | `my-macro-dev` |
 | Local (`forge tunnel`) | `my-macro-local` |
-| Custom env named `alice` | `my-macro-alice` |
-| Custom env named `team-backend` | `my-macro-team-backend` |
+| Custom env `alice` | `my-macro-alice` |
+| Custom env `team-backend` | `my-macro-team-backend` |
 
-`<ContextRoute moduleKey="my-macro">` handles this automatically — it always
-tries an exact match first (covering production), then in non-production
-environments it also accepts any `context.moduleKey` of the form
-`my-macro-<anything>`. **No call-site changes are needed to make your routes
-work across all environments.**
+Without special handling, `<ContextRoute moduleKey="my-macro">` would only
+match in production, and your app would render nothing in every other
+environment.
 
-> **Note:** A `console.warn` is emitted whenever the prefix-match path is taken.
-> This is intentional — it alerts you if two of your manifest module keys share
-> a hyphen-prefix relationship (e.g. `my-macro` and `my-macro-v2`), which would
-> cause both `<ContextRoute>`s to render simultaneously in non-production
-> environments. If you see this warning, rename one of the conflicting module
-> keys so that neither is a prefix of the other.
+**`ContextRoute` handles this for you automatically.** It always tries an exact
+match first (which is the only match ever attempted in production), and in
+non-production environments it additionally accepts any `context.moduleKey` that
+starts with `my-macro-`. This covers all built-in environment suffixes as well
+as arbitrary custom environment names — no call-site changes required.
+
+> **If your module type does not exhibit this suffix behaviour** you don't need
+> to do anything differently. The prefix-match path is only reached when the
+> exact match fails, so it is a safe no-op for unaffected module types.
+
+> **⚠️ Ambiguous module keys:** A `console.warn` is emitted whenever the
+> prefix-match fires. If you see it unexpectedly, check whether two of your
+> manifest module keys share a hyphen-prefix relationship — for example `my-macro`
+> and `my-macro-v2`. In non-production environments both `<ContextRoute>`s would
+> match simultaneously. The fix is to rename one so neither key is a prefix of
+> the other (e.g. `my-macro-legacy` and `my-macro-next`).
 
 ---
 
