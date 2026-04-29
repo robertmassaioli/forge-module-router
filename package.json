@@ -1,6 +1,6 @@
 {
   "name": "forge-module-router",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Context-aware routing primitives for Atlassian Forge Custom UI apps",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -51,6 +51,9 @@
     "custom-ui",
     "module-router"
   ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
