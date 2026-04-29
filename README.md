@@ -175,7 +175,7 @@ This is the primary building block for serving multiple Forge modules from a sin
 
 | Prop        | Type      | Description                                                        |
 |-------------|-----------|--------------------------------------------------------------------|
-| `moduleKey` | `string`  | Only render if `context.moduleKey` equals this value.              |
+| `moduleKey` | `string`  | Only render if `context.moduleKey` matches this value (see below). |
 | `modalType` | `string`  | Only render if `context.extension.modal.type` equals this value.   |
 | `noModal`   | `boolean` | Only render if there is **no** modal present in the context.       |
 
@@ -190,6 +190,34 @@ This is the primary building block for serving multiple Forge modules from a sin
   <AddItemModal />
 </ContextRoute>
 ```
+
+#### `moduleKey` matching across environments
+
+In non-production Forge environments, Atlassian appends the environment name as
+a suffix to `context.moduleKey`. A module declared as `my-macro` in the manifest
+will appear as:
+
+| Environment | `context.moduleKey` |
+|---|---|
+| Production | `my-macro` |
+| Staging | `my-macro-stg` |
+| Development (default) | `my-macro-dev` |
+| Local (`forge tunnel`) | `my-macro-local` |
+| Custom env named `alice` | `my-macro-alice` |
+| Custom env named `team-backend` | `my-macro-team-backend` |
+
+`<ContextRoute moduleKey="my-macro">` handles this automatically — it always
+tries an exact match first (covering production), then in non-production
+environments it also accepts any `context.moduleKey` of the form
+`my-macro-<anything>`. **No call-site changes are needed to make your routes
+work across all environments.**
+
+> **Note:** A `console.warn` is emitted whenever the prefix-match path is taken.
+> This is intentional — it alerts you if two of your manifest module keys share
+> a hyphen-prefix relationship (e.g. `my-macro` and `my-macro-v2`), which would
+> cause both `<ContextRoute>`s to render simultaneously in non-production
+> environments. If you see this warning, rename one of the conflicting module
+> keys so that neither is a prefix of the other.
 
 ---
 
