@@ -222,12 +222,21 @@ as arbitrary custom environment names — no call-site changes required.
 > to do anything differently. The prefix-match path is only reached when the
 > exact match fails, so it is a safe no-op for unaffected module types.
 
-> **⚠️ Ambiguous module keys:** A `console.warn` is emitted whenever the
-> prefix-match fires. If you see it unexpectedly, check whether two of your
-> manifest module keys share a hyphen-prefix relationship — for example `my-macro`
-> and `my-macro-v2`. In non-production environments both `<ContextRoute>`s would
-> match simultaneously. The fix is to rename one so neither key is a prefix of
-> the other (e.g. `my-macro-legacy` and `my-macro-next`).
+> **⚠️ Expected console.warn in non-production environments:** Whenever
+> `ContextRoute` matches via prefix rather than exact match, it emits a
+> `console.warn`. This will appear on **every render** in development, staging,
+> local, and custom environments — even when everything is working correctly. It
+> is informational, not an error.
+>
+> You can safely ignore this warning **if** you can confirm that no two of your
+> manifest module keys share a hyphen-prefix relationship. For example, having
+> both `my-macro` and `my-macro-v2` as separate module keys would be a problem —
+> in non-production environments, both `<ContextRoute>`s would match
+> simultaneously. If that is not the case in your app, the warning is harmless.
+>
+> To silence the warning, ensure all of your manifest module keys are
+> unambiguous — i.e. no key is a hyphen-prefix of another (e.g. prefer
+> `my-macro-legacy` and `my-macro-next` over `my-macro` and `my-macro-v2`).
 
 ---
 
