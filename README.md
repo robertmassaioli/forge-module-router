@@ -358,20 +358,6 @@ interface ForgeContext {
 
 ---
 
-## Migrating from `ep-tool`
-
-| Before (`ep-tool`)          | After (`forge-module-router`)        |
-|-----------------------------|--------------------------------------|
-| `<ViewContext>`             | `<ForgeContextProvider>`             |
-| `useViewContext()`          | `useForgeContext()`                  |
-| `<ContextRoute moduleKey>`  | `<ContextRoute moduleKey>` ✅ same   |
-| `<ContextRoute noModal>`    | `<ContextRoute noModal>` ✅ same     |
-| `<ContextRoute modalType>`  | `<ContextRoute modalType>` ✅ same   |
-| `<SpaRouter>`               | `<SpaRouter>` ✅ same                |
-| `useEffectAsync(cb, dep)`   | Use `useEffect` with an async IIFE directly  |
-
----
-
 ## Troubleshooting
 
 ### "Invalid hook call" / "Cannot read properties of null (reading 'useState')"
