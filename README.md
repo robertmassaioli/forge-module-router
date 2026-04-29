@@ -193,9 +193,16 @@ This is the primary building block for serving multiple Forge modules from a sin
 
 #### `moduleKey` matching across environments
 
+> **Affected module types only.** Not all Forge modules have an environment
+> suffix appended to their `moduleKey`. This behaviour is most commonly observed
+> in **Confluence macros** (`confluence:macro`) and other module types that are
+> installed per-environment rather than globally. If your app only uses module
+> types where you have not observed a suffix, the prefix-match path is never
+> reached and there is no behavioural difference from a plain exact match.
+
 In non-production Forge environments, Atlassian appends the environment name as
-a suffix to `context.moduleKey`. A module declared as `my-macro` in the manifest
-will appear as:
+a suffix to `context.moduleKey` for affected module types. A module declared as
+`my-macro` in the manifest will appear as:
 
 | Environment | `context.moduleKey` |
 |---|---|
