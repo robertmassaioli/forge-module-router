@@ -355,13 +355,98 @@ import { Link } from 'forge-module-router';
 
 ---
 
+### `createUIKitContextRoute(useProductContext, options?)`
+
+Creates a `UIKitContextRoute` component and `useModuleKeyMatch` hook for use inside
+**Forge UI Kit / `ForgeReconciler` trees** — for example, macro config panels registered
+via `ForgeReconciler.addConfig`.
+
+`<ForgeContextProvider>` and `<ContextRoute>` use the DOM renderer and cannot be used
+inside a `ForgeReconciler` tree. `createUIKitContextRoute` solves the same problem in
+that context, using `useProductContext()` from `@forge/react` instead.
+
+Call `createUIKitContextRoute` once at **module scope** (outside any component) so the
+same instances are reused across renders.
+
+```tsx
+import { useProductContext } from '@forge/react';
+import ForgeReconciler from '@forge/react';
+import { createUIKitContextRoute } from 'forge-module-router';
+
+// Create once at module scope
+const { UIKitContextRoute } = createUIKitContextRoute(useProductContext, {
+  // Optional — enables the same strict mode as allowedModuleKeys on ForgeContextProvider.
+  // Conflict validation runs at module evaluation time (before any render).
+  allowedModuleKeys: ['paste-code-macro', 'gist-code-macro', 'in-page-editor'],
+});
+
+const UnifiedConfig = () => (
+  <>
+    <UIKitContextRoute moduleKey="paste-code-macro">
+      <PasteCodeMacroConfig />
+    </UIKitContextRoute>
+    <UIKitContextRoute moduleKey="gist-code-macro">
+      <GistCodeMacroConfig />
+    </UIKitContextRoute>
+    <UIKitContextRoute moduleKey="in-page-editor">
+      <InPageEditorConfig />
+    </UIKitContextRoute>
+  </>
+);
+
+ForgeReconciler.addConfig(<UnifiedConfig />);
+```
+
+`UIKitContextRoute` uses the same environment-aware prefix-matching as `<ContextRoute>`:
+`moduleKey="paste-code-macro"` matches in production (`paste-code-macro`), development
+(`paste-code-macro-dev`), staging (`paste-code-macro-stg`), and any custom environment
+name — with no call-site changes required.
+
+#### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `useProductContext` | `() => Context \| undefined` | The `useProductContext` hook from `@forge/react`. Injected rather than imported directly to avoid version conflicts. |
+| `options.allowedModuleKeys` | `readonly string[]` | Optional. Same semantics as `allowedModuleKeys` on `<ForgeContextProvider>`, but conflict validation runs at **module evaluation time** (even earlier than the async `view.getContext()` resolution). |
+
+#### Returns
+
+| Property | Type | Description |
+|---|---|---|
+| `UIKitContextRoute` | Component | Renders children only when `moduleKey` matches the current Forge module. Returns `null` while context is loading. |
+| `useModuleKeyMatch` | Hook | Returns `true` when the current module matches the given key. Useful for imperative branching. |
+
+#### `useModuleKeyMatch` example
+
+```tsx
+const { useModuleKeyMatch } = createUIKitContextRoute(useProductContext);
+
+const UnifiedConfig = () => {
+  const isPaste = useModuleKeyMatch('paste-code-macro');
+  const isGist  = useModuleKeyMatch('gist-code-macro');
+
+  if (isPaste) return <PasteCodeMacroConfig />;
+  if (isGist)  return <GistCodeMacroConfig />;
+  return null;
+};
+```
+
+> **`console.warn` behaviour** is identical to `<ContextRoute>`: a warn is emitted on
+> every prefix-match render when `allowedModuleKeys` is not provided. Pass
+> `allowedModuleKeys` to `createUIKitContextRoute` to suppress it and enable conflict
+> validation at startup.
+
+---
+
 ### `ForgeContextError`
 
-Thrown in two situations:
+Thrown in three situations:
 
 - By `useForgeContext()` when called outside a `<ForgeContextProvider>`.
 - By `<ContextRoute moduleKey="...">` when the given key is not in the
   `allowedModuleKeys` list declared on the provider (strict mode only).
+- By `<UIKitContextRoute moduleKey="...">` when the given key is not in the
+  `allowedModuleKeys` list passed to `createUIKitContextRoute` (strict mode only).
 
 ```tsx
 import { ForgeContextError } from 'forge-module-router';
@@ -418,6 +503,8 @@ import type {
   ContextRouteProps,
   SpaRouterProps,
   LinkProps,
+  UIKitContextRouteProps,
+  UIKitContextRouteBundle,
 } from 'forge-module-router';
 ```
 
