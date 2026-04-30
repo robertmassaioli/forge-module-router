@@ -33,7 +33,14 @@ jobs:
         run: npm test
 
       - name: Set version from release tag
-        run: npm version ${{ github.event.release.tag_name }} --no-git-tag-version
+        run: |
+          RELEASE_VERSION="${{ github.event.release.tag_name }}"
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          if [ "v${CURRENT_VERSION}" != "${RELEASE_VERSION}" ]; then
+            npm version "${RELEASE_VERSION}" --no-git-tag-version
+          else
+            echo "package.json already at ${RELEASE_VERSION}, skipping npm version"
+          fi
 
       - name: Build
         run: npm run build

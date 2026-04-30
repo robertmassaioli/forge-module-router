@@ -1,6 +1,6 @@
 {
   "name": "forge-module-router",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Context-aware routing primitives for Atlassian Forge Custom UI apps",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
