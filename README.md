@@ -141,14 +141,46 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 Fetches the Forge context via `view.getContext()` and provides it to the component tree. Renders `fallback` until the context resolves.
 
+| Prop | Type | Description |
+|---|---|---|
+| `fallback` | `ReactNode` | Rendered while context loads. Default: `null`. |
+| `onError` | `(err: unknown) => void` | Called if `view.getContext()` rejects. |
+| `allowedModuleKeys` | `readonly string[]` | The complete list of manifest module keys used by this app. Enables strict mode — see below. |
+
 ```tsx
 <ForgeContextProvider
-  fallback={<Spinner />}         // Optional: shown while context loads (default: null)
-  onError={(err) => report(err)} // Optional: called if view.getContext() rejects
+  fallback={<Spinner />}
+  onError={(err) => report(err)}
+  allowedModuleKeys={['paste-code-macro', 'gist-code-macro', 'my-panel']}
 >
   {children}
 </ForgeContextProvider>
 ```
+
+#### `allowedModuleKeys` — strict mode
+
+Passing `allowedModuleKeys` enables strict mode, which provides three additional
+guarantees:
+
+1. **Startup conflict validation** — on mount, the provider checks that no two
+   declared keys share a hyphen-prefix relationship (e.g. `my-macro` and
+   `my-macro-v2`). If a conflict is found, a `ForgeModuleKeyConflictError` is
+   thrown immediately — before any children mount — so the problem is caught at
+   startup rather than discovered by accident. Wrap the provider in a React error
+   boundary to display a clear message in development.
+
+2. **Typo detection in `<ContextRoute>`** — any `<ContextRoute moduleKey="...">` 
+   whose key is not in the declared list throws a `ForgeContextError` immediately,
+   with a message that names the key and lists the allowed values. This catches
+   typos and stale keys on every render regardless of which module is currently
+   active.
+
+3. **Suppresses the per-render `console.warn`** — because conflicts have already
+   been ruled out at startup, the warning emitted on every prefix-match render is
+   no longer needed and is silenced.
+
+`allowedModuleKeys` is optional and fully backwards-compatible — when omitted,
+all existing behaviour is preserved exactly.
 
 ---
 
@@ -226,13 +258,16 @@ as arbitrary custom environment names — no call-site changes required.
 > `ContextRoute` matches via prefix rather than exact match, it emits a
 > `console.warn`. This will appear on **every render** in development, staging,
 > local, and custom environments — even when everything is working correctly. It
-> is informational, not an error, and **cannot be suppressed**.
+> is informational, not an error.
 >
-> The warning message also alerts you to a genuine risk: if two of your manifest
-> module keys share a hyphen-prefix relationship — for example `my-macro` and
+> The warning also alerts you to a genuine risk: if two of your manifest module
+> keys share a hyphen-prefix relationship — for example `my-macro` and
 > `my-macro-v2` — then in non-production environments both `<ContextRoute>`s
-> would match simultaneously. If your module keys are all unambiguous (no key is
-> a hyphen-prefix of another), the warning is harmless and can be ignored.
+> would match simultaneously.
+>
+> **To suppress this warning**, pass `allowedModuleKeys` to `<ForgeContextProvider>`.
+> This validates your key list for conflicts at startup and silences the per-render
+> warn. See [`allowedModuleKeys` — strict mode](#allowedmodulekeys--strict-mode) above.
 
 ---
 
@@ -322,7 +357,11 @@ import { Link } from 'forge-module-router';
 
 ### `ForgeContextError`
 
-Thrown by `useForgeContext()` when called outside a `<ForgeContextProvider>`.
+Thrown in two situations:
+
+- By `useForgeContext()` when called outside a `<ForgeContextProvider>`.
+- By `<ContextRoute moduleKey="...">` when the given key is not in the
+  `allowedModuleKeys` list declared on the provider (strict mode only).
 
 ```tsx
 import { ForgeContextError } from 'forge-module-router';
@@ -331,7 +370,34 @@ try {
   // ...
 } catch (err) {
   if (err instanceof ForgeContextError) {
-    console.error('Missing ForgeContextProvider in tree');
+    console.error('Missing ForgeContextProvider or undeclared moduleKey');
+  }
+}
+```
+
+---
+
+### `ForgeModuleKeyConflictError`
+
+Thrown during render by `<ForgeContextProvider>` when `allowedModuleKeys` is
+provided and two of the declared keys share a hyphen-prefix relationship (e.g.
+`my-macro` and `my-macro-v2`). This is caught by the nearest React error
+boundary.
+
+| Property | Type | Description |
+|---|---|---|
+| `prefixKey` | `string` | The key that is a hyphen-prefix of the other. |
+| `conflictingKey` | `string` | The key that starts with `prefixKey + '-'`. |
+
+```tsx
+import { ForgeModuleKeyConflictError } from 'forge-module-router';
+
+// In an error boundary:
+componentDidCatch(error: unknown) {
+  if (error instanceof ForgeModuleKeyConflictError) {
+    console.error(
+      `Conflicting module keys: "${error.prefixKey}" and "${error.conflictingKey}"`
+    );
   }
 }
 ```
