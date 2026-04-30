@@ -1,8 +1,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { ForgeContextProvider, useForgeContext } from '../src/ViewContext';
-import { ForgeContextError } from '../src/errors';
+import { ForgeContextProvider, useForgeContext, AllowedModuleKeysContext } from '../src/ViewContext';
+import { ForgeContextError, ForgeModuleKeyConflictError } from '../src/errors';
 import type { ForgeContext } from '../src/types';
 
 // Mock @forge/bridge so tests never need a real Forge environment
@@ -36,13 +36,24 @@ function ContextConsumer () {
 // Helper: render within a provider that resolves to mockContext by default
 function renderWithProvider (
   ui: React.ReactNode,
-  options?: { fallback?: React.ReactNode; onError?: (e: unknown) => void }
+  options?: { fallback?: React.ReactNode; onError?: (e: unknown) => void; allowedModuleKeys?: readonly string[] }
 ) {
   return render(
-    <ForgeContextProvider fallback={options?.fallback} onError={options?.onError}>
+    <ForgeContextProvider
+      fallback={options?.fallback}
+      onError={options?.onError}
+      allowedModuleKeys={options?.allowedModuleKeys}
+    >
       {ui}
     </ForgeContextProvider>
   );
+}
+
+// Helper: consumer that reads AllowedModuleKeysContext directly for inspection
+function AllowedKeysConsumer ({ onKeys }: { onKeys: (keys: ReadonlySet<string> | null) => void }) {
+  const keys = React.useContext(AllowedModuleKeysContext);
+  onKeys(keys);
+  return null;
 }
 
 beforeEach(() => {
@@ -102,6 +113,133 @@ describe('ForgeContextProvider', () => {
     renderWithProvider(<div>children</div>, { fallback: <div>Loading...</div>, onError });
     await waitFor(() => expect(onError).toHaveBeenCalled());
     expect(screen.queryByText('children')).not.toBeInTheDocument();
+  });
+});
+
+// Minimal error boundary for catching render errors in tests
+class TestErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError?: (err: unknown) => void },
+  { error: unknown }
+> {
+  constructor (props: { children: React.ReactNode; onError?: (err: unknown) => void }) {
+    super(props);
+    this.state = { error: undefined };
+  }
+  static getDerivedStateFromError (error: unknown) { return { error }; }
+  componentDidCatch (error: unknown) { this.props.onError?.(error); }
+  render () {
+    if (this.state.error !== undefined) return <div>error-boundary</div>;
+    return this.props.children;
+  }
+}
+
+function renderWithProviderAndBoundary (
+  ui: React.ReactNode,
+  options?: { allowedModuleKeys?: readonly string[] },
+  onError?: (err: unknown) => void
+) {
+  return render(
+    <TestErrorBoundary onError={onError}>
+      <ForgeContextProvider allowedModuleKeys={options?.allowedModuleKeys}>
+        {ui}
+      </ForgeContextProvider>
+    </TestErrorBoundary>
+  );
+}
+
+describe('ForgeContextProvider — allowedModuleKeys', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.mocked(console.error).mockRestore();
+  });
+
+  it('provides null AllowedModuleKeysContext when allowedModuleKeys is not specified', async () => {
+    mockGetContext.mockResolvedValue(mockContext);
+    let capturedKeys: ReadonlySet<string> | null | undefined = undefined;
+    renderWithProvider(<AllowedKeysConsumer onKeys={(k) => { capturedKeys = k; }} />);
+    await waitFor(() => expect(capturedKeys).not.toBeUndefined());
+    expect(capturedKeys).toBeNull();
+  });
+
+  it('provides a Set from AllowedModuleKeysContext when allowedModuleKeys is specified', async () => {
+    mockGetContext.mockResolvedValue(mockContext);
+    let capturedKeys: ReadonlySet<string> | null | undefined = undefined;
+    renderWithProvider(
+      <AllowedKeysConsumer onKeys={(k) => { capturedKeys = k; }} />,
+      { allowedModuleKeys: ['my-module', 'other-module'] }
+    );
+    await waitFor(() => expect(capturedKeys).not.toBeUndefined());
+    expect(capturedKeys).toBeInstanceOf(Set);
+    expect((capturedKeys as ReadonlySet<string>).has('my-module')).toBe(true);
+    expect((capturedKeys as ReadonlySet<string>).has('other-module')).toBe(true);
+  });
+
+  it('catches ForgeModuleKeyConflictError in error boundary when two keys share a hyphen-prefix', async () => {
+    mockGetContext.mockResolvedValue(mockContext);
+    let caughtError: unknown;
+    renderWithProviderAndBoundary(
+      <div>children</div>,
+      { allowedModuleKeys: ['my-macro', 'my-macro-v2', 'unrelated-module'] },
+      (err) => { caughtError = err; }
+    );
+    // Error boundary catches the render error and shows fallback
+    await waitFor(() => expect(screen.getByText('error-boundary')).toBeInTheDocument());
+    expect(caughtError).toBeInstanceOf(ForgeModuleKeyConflictError);
+  });
+
+  it('ForgeModuleKeyConflictError names both conflicting keys', async () => {
+    mockGetContext.mockResolvedValue(mockContext);
+    let caughtError: unknown;
+    renderWithProviderAndBoundary(
+      <div>children</div>,
+      { allowedModuleKeys: ['my-macro', 'my-macro-v2'] },
+      (err) => { caughtError = err; }
+    );
+    await waitFor(() => expect(screen.getByText('error-boundary')).toBeInTheDocument());
+    const error = caughtError as ForgeModuleKeyConflictError;
+    expect(error).toBeInstanceOf(ForgeModuleKeyConflictError);
+    expect(error.prefixKey).toBe('my-macro');
+    expect(error.conflictingKey).toBe('my-macro-v2');
+  });
+
+  it('does NOT error when allowedModuleKeys has no prefix conflicts', async () => {
+    mockGetContext.mockResolvedValue(mockContext);
+    renderWithProviderAndBoundary(
+      <div>children</div>,
+      { allowedModuleKeys: ['paste-code-macro', 'gist-code-macro', 'my-panel'] }
+    );
+    await waitFor(() => expect(screen.getByText('children')).toBeInTheDocument());
+    expect(screen.queryByText('error-boundary')).not.toBeInTheDocument();
+  });
+
+  it('does NOT error for keys that share a prefix but not a hyphen-prefix relationship', async () => {
+    // 'macro' and 'macroext' — 'macroext' does NOT start with 'macro-' so no conflict
+    mockGetContext.mockResolvedValue(mockContext);
+    renderWithProviderAndBoundary(
+      <div>children</div>,
+      { allowedModuleKeys: ['macro', 'macroext'] }
+    );
+    await waitFor(() => expect(screen.getByText('children')).toBeInTheDocument());
+    expect(screen.queryByText('error-boundary')).not.toBeInTheDocument();
+  });
+
+  it('catches conflict regardless of order in the allowedModuleKeys array', async () => {
+    mockGetContext.mockResolvedValue(mockContext);
+    let caughtError: unknown;
+    // v2 listed before base key — should still detect the conflict
+    renderWithProviderAndBoundary(
+      <div>children</div>,
+      { allowedModuleKeys: ['my-macro-v2', 'my-macro'] },
+      (err) => { caughtError = err; }
+    );
+    await waitFor(() => expect(screen.getByText('error-boundary')).toBeInTheDocument());
+    expect(caughtError).toBeInstanceOf(ForgeModuleKeyConflictError);
+    const error = caughtError as ForgeModuleKeyConflictError;
+    // Order may vary — check both keys are named
+    expect([error.prefixKey, error.conflictingKey]).toContain('my-macro');
+    expect([error.prefixKey, error.conflictingKey]).toContain('my-macro-v2');
   });
 });
 

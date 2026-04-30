@@ -8,7 +8,7 @@ export { ContextRoute } from './ContextRouter';
 export { SpaRouter, Link } from './SpaRouter';
 
 // Errors
-export { ForgeContextError } from './errors';
+export { ForgeContextError, ForgeModuleKeyConflictError } from './errors';
 
 // Types
 export type {

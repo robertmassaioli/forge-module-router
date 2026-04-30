@@ -30,6 +30,24 @@ export interface ForgeContextProviderProps {
    * Called if `view.getContext()` rejects. Useful for error reporting.
    */
   onError?: (error: unknown) => void;
+  /**
+   * The complete list of manifest module keys used by this app.
+   *
+   * When provided, `ForgeContextProvider` will:
+   * - Validate on mount that no two keys share a hyphen-prefix relationship
+   *   (which would cause ambiguous routing in non-production environments),
+   *   throwing a `ForgeModuleKeyConflictError` if a conflict is found.
+   * - Cause `<ContextRoute moduleKey="...">` to throw a `ForgeContextError`
+   *   if the given key is not in this list, catching typos early.
+   * - Suppress the per-render `console.warn` that fires when prefix-match is
+   *   used, since conflicts have already been ruled out at startup.
+   *
+   * @example
+   * <ForgeContextProvider
+   *   allowedModuleKeys={['paste-code-macro', 'gist-code-macro', 'my-panel']}
+   * >
+   */
+  allowedModuleKeys?: readonly string[];
 }
 
 export interface ContextRouteProps {

@@ -1,5 +1,6 @@
-import React from 'react';
-import { useForgeContext } from './ViewContext';
+import React, { useContext } from 'react';
+import { useForgeContext, AllowedModuleKeysContext } from './ViewContext';
+import { ForgeContextError } from './errors';
 import type { ContextRouteProps } from './types';
 
 /**
@@ -8,13 +9,15 @@ import type { ContextRouteProps } from './types';
  *
  * Matching rules (applied in order):
  * 1. Exact match — always tried first; covers production and any exact dev match.
- * 2. Prefix match — only in non-production (`environmentType !== 'PRODUCTION'`):
+ * 2. Prefix match — only when `environmentType` is explicitly non-PRODUCTION:
  *    accepts `contextKey` values of the form `<propKey>-<anything>`.
- *    This handles the built-in suffixes (`-dev`, `-stg`, `-local`) as well as
+ *    This handles all built-in suffixes (`-dev`, `-stg`, `-local`) as well as
  *    arbitrary custom environment names (e.g. `-alice`, `-my-feature-branch`).
  *
- * When the prefix-match branch fires a `console.warn` is emitted in non-production
- * builds to alert developers to potential key ambiguity (see below).
+ * When `conflictsValidated` is false (no `allowedModuleKeys` declared on the
+ * provider), a `console.warn` is emitted to alert developers to potential key
+ * ambiguity. When `conflictsValidated` is true, the warn is suppressed because
+ * conflicts have already been ruled out at startup.
  *
  * NOTE: `environmentType` is returned by Forge at runtime but is not yet typed in
  * `@forge/bridge`'s FullContext. We access it via a cast until the upstream type
@@ -25,6 +28,7 @@ function moduleKeyMatches(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context: Record<string, any>,
   propKey: string,
+  conflictsValidated: boolean,
 ): boolean {
   // Rule 1: exact match — always valid including in production
   if (contextKey === propKey) return true;
@@ -39,16 +43,19 @@ function moduleKeyMatches(
     environmentType !== 'PRODUCTION' &&
     contextKey.startsWith(propKey + '-')
   ) {
-    // Warn whenever prefix-match fires. This is only reachable when environmentType
-    // is explicitly non-PRODUCTION — i.e. it never fires in production — so no
-    // NODE_ENV guard is needed (and process.env is not available in the Forge
-    // Custom UI browser runtime anyway).
-    console.warn(
-      `[forge-module-router] ContextRoute moduleKey="${propKey}" matched via environment ` +
-      `prefix-match (context moduleKey is "${contextKey}", environmentType is "${environmentType}"). ` +
-      `If you have another <ContextRoute> whose moduleKey also starts with "${propKey}-", ` +
-      `both routes will render simultaneously. Rename one manifest module key to avoid ambiguity.`
-    );
+    if (!conflictsValidated) {
+      // Warn whenever prefix-match fires without pre-validation. This is only
+      // reachable when environmentType is explicitly non-PRODUCTION so it never
+      // fires in production. To suppress this warn, pass `allowedModuleKeys` to
+      // <ForgeContextProvider> — conflicts will then be validated at startup instead.
+      console.warn(
+        `[forge-module-router] ContextRoute moduleKey="${propKey}" matched via environment ` +
+        `prefix-match (context moduleKey is "${contextKey}", environmentType is "${environmentType}"). ` +
+        `If you have another <ContextRoute> whose moduleKey also starts with "${propKey}-", ` +
+        `both routes will render simultaneously. To suppress this warning and enable ` +
+        `startup conflict validation, pass allowedModuleKeys to <ForgeContextProvider>.`
+      );
+    }
     return true;
   }
 
@@ -71,9 +78,11 @@ function moduleKeyMatches(
  * that starts with the given `moduleKey` followed by a hyphen, so
  * `<ContextRoute moduleKey="my-module">` matches in all environments without changes.
  *
- * A `console.warn` is emitted (in non-production builds only) whenever the prefix-match
- * path is taken, to alert developers that two `<ContextRoute>` instances with keys that
- * share a hyphen-prefix relationship could both render simultaneously.
+ * ### Conflict detection via `allowedModuleKeys`
+ *
+ * Pass `allowedModuleKeys` to `<ForgeContextProvider>` to enable startup-time conflict
+ * validation and suppress the per-render `console.warn`. Any `moduleKey` prop not in
+ * the declared list will throw a `ForgeContextError` immediately.
  *
  * @example
  * // Render only for a specific module, with no modal open
@@ -97,10 +106,30 @@ export function ContextRoute ({
   // giving a clear and actionable error message to the developer.
   const context = useForgeContext();
 
-  // Filter by moduleKey — uses prefix-match in non-production environments
-  // to handle Forge's environment suffix appended to moduleKey.
-  if (moduleKey !== undefined && !moduleKeyMatches(context.moduleKey, context as unknown as Record<string, unknown>, moduleKey)) {
-    return null;
+  // Read the allowed keys set from the provider.
+  // null  = no allowedModuleKeys declared (warn mode)
+  // Set   = allowedModuleKeys declared and conflict-validated (strict + no-warn mode)
+  const allowedKeys = useContext(AllowedModuleKeysContext);
+  const conflictsValidated = allowedKeys !== null;
+
+  if (moduleKey !== undefined) {
+    // Step 1: validate prop membership BEFORE attempting any match.
+    // When allowedModuleKeys is declared, any moduleKey not in the list throws
+    // immediately — catching typos and stale keys on every render, regardless of
+    // which module is currently active in the context.
+    if (allowedKeys !== null && !allowedKeys.has(moduleKey)) {
+      throw new ForgeContextError(
+        `[forge-module-router] <ContextRoute moduleKey="${moduleKey}"> uses a moduleKey ` +
+        `that was not declared in the allowedModuleKeys list on <ForgeContextProvider>. ` +
+        `Declared keys: ${[...allowedKeys].join(', ')}. ` +
+        `Did you make a typo, or forget to add this key to allowedModuleKeys?`
+      );
+    }
+
+    // Step 2: match — suppress warn if conflicts have been pre-validated
+    if (!moduleKeyMatches(context.moduleKey, context as unknown as Record<string, unknown>, moduleKey, conflictsValidated)) {
+      return null;
+    }
   }
 
   const contextModalType = context.extension?.modal?.type;

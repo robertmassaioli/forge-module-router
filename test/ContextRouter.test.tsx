@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ContextRoute } from '../src/ContextRouter';
 import { ForgeContextError } from '../src/errors';
-import { ForgeContextInternal } from '../src/ViewContext';
+import { ForgeContextInternal, AllowedModuleKeysContext } from '../src/ViewContext';
 import type { ForgeContext } from '../src/types';
 
 vi.mock('@forge/bridge', () => ({
@@ -37,6 +37,25 @@ function renderWithContext (
   return render(
     <InternalProvider value={context}>
       <ContextRoute {...routeProps}>{child}</ContextRoute>
+    </InternalProvider>
+  );
+}
+
+// Helper: render a ContextRoute with both context AND allowedModuleKeys injected directly
+function renderWithContextAndAllowedKeys (
+  context: ForgeContext,
+  allowedKeys: readonly string[] | null,
+  routeProps: Omit<React.ComponentProps<typeof ContextRoute>, 'children'>,
+  child = <div>content</div>
+) {
+  const InternalProvider = (ForgeContextInternal as unknown as { Provider: React.Provider<ForgeContext | undefined> }).Provider;
+  const AllowedProvider = (AllowedModuleKeysContext as unknown as { Provider: React.Provider<ReadonlySet<string> | null> }).Provider;
+  const allowedSet = allowedKeys !== null ? new Set(allowedKeys) : null;
+  return render(
+    <InternalProvider value={context}>
+      <AllowedProvider value={allowedSet}>
+        <ContextRoute {...routeProps}>{child}</ContextRoute>
+      </AllowedProvider>
     </InternalProvider>
   );
 }
@@ -260,6 +279,104 @@ describe('ContextRoute', () => {
         render(<ContextRoute><div>content</div></ContextRoute>)
       ).toThrow(ForgeContextError);
       consoleError.mockRestore();
+    });
+  });
+
+  describe('allowedModuleKeys — strict mode', () => {
+    let consoleError: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      consoleError.mockRestore();
+    });
+
+    it('renders children when moduleKey is in the allowed list (exact match)', () => {
+      renderWithContextAndAllowedKeys(
+        makeContext({ moduleKey: 'my-module' }),
+        ['my-module', 'other-module'],
+        { moduleKey: 'my-module' }
+      );
+      expect(screen.getByText('content')).toBeInTheDocument();
+    });
+
+    it('renders children when moduleKey is in the allowed list (prefix match in DEVELOPMENT)', () => {
+      renderWithContextAndAllowedKeys(
+        makeContext({ moduleKey: 'my-module-dev', environmentType: 'DEVELOPMENT' }),
+        ['my-module', 'other-module'],
+        { moduleKey: 'my-module' }
+      );
+      expect(screen.getByText('content')).toBeInTheDocument();
+    });
+
+    it('throws ForgeContextError when moduleKey is NOT in the allowed list', () => {
+      expect(() =>
+        renderWithContextAndAllowedKeys(
+          makeContext({ moduleKey: 'my-module' }),
+          ['other-module', 'another-module'],
+          { moduleKey: 'my-module' }
+        )
+      ).toThrow(ForgeContextError);
+    });
+
+    it('error message for undeclared moduleKey names the key and lists allowed keys', () => {
+      let caught: unknown;
+      try {
+        renderWithContextAndAllowedKeys(
+          makeContext({ moduleKey: 'my-module' }),
+          ['other-module', 'another-module'],
+          { moduleKey: 'my-module' }
+        );
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ForgeContextError);
+      const msg = (caught as ForgeContextError).message;
+      expect(msg).toContain('my-module');
+      expect(msg).toContain('other-module');
+      expect(msg).toContain('another-module');
+    });
+
+    it('suppresses console.warn on prefix-match when allowedModuleKeys is provided', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      renderWithContextAndAllowedKeys(
+        makeContext({ moduleKey: 'my-module-dev', environmentType: 'DEVELOPMENT' }),
+        ['my-module', 'other-module'],
+        { moduleKey: 'my-module' }
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('still emits console.warn on prefix-match when allowedModuleKeys is NOT provided (null)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      renderWithContextAndAllowedKeys(
+        makeContext({ moduleKey: 'my-module-dev', environmentType: 'DEVELOPMENT' }),
+        null, // no allowedModuleKeys
+        { moduleKey: 'my-module' }
+      );
+      expect(warnSpy).toHaveBeenCalledOnce();
+      warnSpy.mockRestore();
+    });
+
+    it('renders null (no throw) when moduleKey is in allowed list but does not match context', () => {
+      // 'other-module' is in the list but context has 'my-module' — should return null silently
+      renderWithContextAndAllowedKeys(
+        makeContext({ moduleKey: 'my-module' }),
+        ['my-module', 'other-module'],
+        { moduleKey: 'other-module' }
+      );
+      expect(screen.queryByText('content')).not.toBeInTheDocument();
+    });
+
+    it('membership check is case-sensitive', () => {
+      expect(() =>
+        renderWithContextAndAllowedKeys(
+          makeContext({ moduleKey: 'My-Module' }),
+          ['my-module'],
+          { moduleKey: 'My-Module' }
+        )
+      ).toThrow(ForgeContextError);
     });
   });
 });
