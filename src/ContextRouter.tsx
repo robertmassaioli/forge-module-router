@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { useForgeContext, AllowedModuleKeysContext } from './ViewContext';
+import React from 'react';
+import { useForgeContext, useAllowedModuleKeys } from './ViewContext';
 import { ForgeContextError } from './errors';
 import type { ContextRouteProps } from './types';
 
@@ -109,7 +109,7 @@ export function ContextRoute ({
   // Read the allowed keys set from the provider.
   // null  = no allowedModuleKeys declared (warn mode)
   // Set   = allowedModuleKeys declared and conflict-validated (strict + no-warn mode)
-  const allowedKeys = useContext(AllowedModuleKeysContext);
+  const allowedKeys = useAllowedModuleKeys();
   const conflictsValidated = allowedKeys !== null;
 
   if (moduleKey !== undefined) {

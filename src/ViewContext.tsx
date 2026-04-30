@@ -13,6 +13,19 @@ export const ForgeContextInternal = createContext<ContextValue>(undefined);
 export const AllowedModuleKeysContext = createContext<ReadonlySet<string> | null>(null);
 
 /**
+ * Returns the current allowed module keys set, or null if allowedModuleKeys
+ * was not declared on the nearest ForgeContextProvider.
+ *
+ * Internal use only — not exported from the public index.
+ *
+ * - null  → no allowedModuleKeys declared (warn mode)
+ * - Set   → allowedModuleKeys declared and conflict-validated (strict + no-warn mode)
+ */
+export function useAllowedModuleKeys (): ReadonlySet<string> | null {
+  return useContext(AllowedModuleKeysContext);
+}
+
+/**
  * Returns the current Forge context object.
  *
  * Must be used within a `<ForgeContextProvider>` — throws a `ForgeContextError`
