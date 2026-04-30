@@ -14,10 +14,8 @@ import type { ContextRouteProps } from './types';
  *    This handles all built-in suffixes (`-dev`, `-stg`, `-local`) as well as
  *    arbitrary custom environment names (e.g. `-alice`, `-my-feature-branch`).
  *
- * When `conflictsValidated` is false (no `allowedModuleKeys` declared on the
- * provider), a `console.warn` is emitted to alert developers to potential key
- * ambiguity. When `conflictsValidated` is true, the warn is suppressed because
- * conflicts have already been ruled out at startup.
+ * This is a pure predicate — it has no side effects. Any console.warn about
+ * potential conflicts is the responsibility of the call site.
  *
  * NOTE: `environmentType` is returned by Forge at runtime but is not yet typed in
  * `@forge/bridge`'s FullContext. We access it via a cast until the upstream type
@@ -28,7 +26,6 @@ function moduleKeyMatches(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   context: Record<string, any>,
   propKey: string,
-  conflictsValidated: boolean,
 ): boolean {
   // Rule 1: exact match — always valid including in production
   if (contextKey === propKey) return true;
@@ -43,19 +40,6 @@ function moduleKeyMatches(
     environmentType !== 'PRODUCTION' &&
     contextKey.startsWith(propKey + '-')
   ) {
-    if (!conflictsValidated) {
-      // Warn whenever prefix-match fires without pre-validation. This is only
-      // reachable when environmentType is explicitly non-PRODUCTION so it never
-      // fires in production. To suppress this warn, pass `allowedModuleKeys` to
-      // <ForgeContextProvider> — conflicts will then be validated at startup instead.
-      console.warn(
-        `[forge-module-router] ContextRoute moduleKey="${propKey}" matched via environment ` +
-        `prefix-match (context moduleKey is "${contextKey}", environmentType is "${environmentType}"). ` +
-        `If you have another <ContextRoute> whose moduleKey also starts with "${propKey}-", ` +
-        `both routes will render simultaneously. To suppress this warning and enable ` +
-        `startup conflict validation, pass allowedModuleKeys to <ForgeContextProvider>.`
-      );
-    }
     return true;
   }
 
@@ -126,9 +110,25 @@ export function ContextRoute ({
       );
     }
 
-    // Step 2: match — suppress warn if conflicts have been pre-validated
-    if (!moduleKeyMatches(context.moduleKey, context as unknown as Record<string, unknown>, moduleKey, conflictsValidated)) {
+    // Step 2: match — emit warn at the call site if this is a prefix-match
+    // and conflicts have not been pre-validated via allowedModuleKeys.
+    const matched = moduleKeyMatches(context.moduleKey, context as unknown as Record<string, unknown>, moduleKey);
+    if (!matched) {
       return null;
+    }
+    const isPrefixMatch = context.moduleKey !== moduleKey;
+    if (isPrefixMatch && !conflictsValidated) {
+      // Warn whenever prefix-match fires without pre-validation. Only reachable
+      // when environmentType is explicitly non-PRODUCTION, so never fires in
+      // production. To suppress this warning, pass allowedModuleKeys to
+      // <ForgeContextProvider> — conflicts will be validated at startup instead.
+      console.warn(
+        `[forge-module-router] ContextRoute moduleKey="${moduleKey}" matched via environment ` +
+        `prefix-match (context moduleKey is "${context.moduleKey}"). ` +
+        `If you have another <ContextRoute> whose moduleKey also starts with "${moduleKey}-", ` +
+        `both routes will render simultaneously. To suppress this warning and enable ` +
+        `startup conflict validation, pass allowedModuleKeys to <ForgeContextProvider>.`
+      );
     }
   }
 
