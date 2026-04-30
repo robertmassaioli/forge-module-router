@@ -1,8 +1,11 @@
 // Context provider & hook
 export { ForgeContextProvider, useForgeContext } from './ViewContext';
 
-// Declarative context-based routing
+// Declarative context-based routing (Custom UI / DOM renderer)
 export { ContextRoute } from './ContextRouter';
+
+// Declarative context-based routing (UI Kit / ForgeReconciler)
+export { createUIKitContextRoute } from './UIKitContextRoute';
 
 // SPA routing integrated with Forge history
 export { SpaRouter, Link } from './SpaRouter';
@@ -20,5 +23,7 @@ export type {
   ContextRouteProps,
   SpaRouterProps,
   LinkProps,
+  UIKitContextRouteProps,
+  UIKitContextRouteBundle,
 } from './types';
 

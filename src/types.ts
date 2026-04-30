@@ -80,3 +80,31 @@ export interface LinkProps {
   children: React.ReactNode;
   className?: string;
 }
+
+export interface UIKitContextRouteProps {
+  /**
+   * The manifest module key to match against. Uses environment-aware
+   * prefix-matching so `-dev`, `-stg`, `-local`, and custom environment
+   * suffixes are handled automatically.
+   */
+  moduleKey: string;
+  children: React.ReactNode;
+}
+
+/**
+ * The object returned by `createUIKitContextRoute`.
+ */
+export interface UIKitContextRouteBundle {
+  /**
+   * A component that renders its children only when the current Forge module
+   * matches `moduleKey`. Mirrors `<ContextRoute>` for UI Kit / ForgeReconciler
+   * trees where `<ForgeContextProvider>` cannot be used.
+   */
+  UIKitContextRoute: (props: UIKitContextRouteProps) => React.ReactElement | null;
+  /**
+   * A hook that returns `true` when the current Forge module matches the given
+   * `moduleKey`, using the same environment-aware prefix-match logic as
+   * `<ContextRoute>`.
+   */
+  useModuleKeyMatch: (moduleKey: string) => boolean;
+}
